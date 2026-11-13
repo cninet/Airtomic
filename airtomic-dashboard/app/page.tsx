@@ -57,7 +57,7 @@ export default function AirtomicDashboard() {
   const badge = getStateBadge(data.state);
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 p-6 md:p-10">
+    <div className="min-h-screen bg-slate-50 text-slate-900 p-6 md:p-10">
       <div className="max-w-6xl mx-auto space-y-6">
         
         {/* Header (พื้นหลังสีเขียว bg-green-600 คุมโทนเดียวกับการ์ด) */}
@@ -134,7 +134,7 @@ export default function AirtomicDashboard() {
             <span className="text-xs uppercase tracking-wider text-slate-50 font-semibold">Servo Actuator Control</span>
             
             {/* กล่องควบคุมแอร์ */}
-            <div className="flex items-center justify-between bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs">
+            <div className="flex items-center justify-between bg-slate-100 p-3.5 rounded-2xl border border-slate-200 shadow-xs">
               <div>
                 <p className="font-medium text-slate-900">เครื่องปรับอากาศ (AC)</p>
                 <p className={`text-xs ${data.ac === 'ON' ? 'text-amber-600 font-medium' : 'text-slate-500'}`}>
@@ -151,7 +151,7 @@ export default function AirtomicDashboard() {
             </div>
 
             {/* กล่องควบคุมไฟ */}
-            <div className="flex items-center justify-between bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs">
+            <div className="flex items-center justify-between bg-slate-100 p-3.5 rounded-xl border border-slate-200 shadow-xs">
               <div>
                 <p className="font-medium text-slate-900">ไฟส่องสว่าง (Light)</p>
                 <p className={`text-xs ${data.light === 'ON' ? 'text-amber-600 font-medium' : 'text-slate-400'}`}>
