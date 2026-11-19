@@ -1,45 +1,71 @@
 'use client';
 
-import React, { useState } from 'react';
-import { 
-  Thermometer, Droplets, Sun, Bluetooth, 
-  Power, AlertTriangle, CheckCircle2, Radio 
+import React, { useEffect, useState } from 'react';
+import {
+  Thermometer, Droplets, Sun, Bluetooth,
+  Power, AlertTriangle, CheckCircle2, Radio, LogOut
 } from 'lucide-react';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
+import { onValue, ref, set } from 'firebase/database';
+import { auth, db } from '@/firebase';
 import { TelemetryData } from '@/interfaces';
 
 export default function AirtomicDashboard() {
-  const [data, setData] = useState<TelemetryData>({
-    gw: 'GW01',
-    node_id: 'SN01',
-    seq: 1024,
-    temp: 25.4,
-    hum: 58.2,
-    vib: 1,
-    dist: 83.5,
-    lux: 312,
-    pir: 0,
-    rssi: -67,
-    state: 'ABSENT',
-    conf: 0.93,
-    ac: 'ON',
-    light: 'ON',
-  });
-
+  const [user, setUser] = useState<User | null | undefined>(undefined); // undefined = still checking login
+  const [nodes, setNodes] = useState<Record<string, TelemetryData>>({});
+  const [selected, setSelected] = useState('');
+  const [error, setError] = useState('');
   const [isSending, setIsSending] = useState(false);
 
+  useEffect(() => onAuthStateChanged(auth, setUser), []);
+
+  // Live data: the gateway writes nodes/<node_id>; onValue fires on every change.
+  useEffect(() => {
+    if (!user) return;
+    return onValue(
+      ref(db, 'nodes'),
+      (snap) => {
+        setNodes(snap.val() ?? {});
+        setError('');
+      },
+      (err) => setError(err.message),
+    );
+  }, [user]);
+
+  if (user === undefined) return <Centered>กำลังโหลด...</Centered>;
+  if (!user) return <Login />;
+
+  const nodeIds = Object.keys(nodes);
+  const data = nodes[selected] ?? nodes[nodeIds[0]];
+  if (!data) {
+    return (
+      <Centered>
+        {error ? (
+          <div className="text-center space-y-2">
+            <p className="text-rose-600 font-medium">อ่านข้อมูลไม่ได้: {error}</p>
+            <p className="text-sm">ถ้าเป็น permission denied: เพิ่ม <code>operators/{user.uid}</code> = <code>true</code> ใน Firebase</p>
+            <button onClick={() => signOut(auth)} className="text-sm underline">ออกจากระบบ</button>
+          </div>
+        ) : (
+          'รอข้อมูลจาก Gateway...'
+        )}
+      </Centered>
+    );
+  }
+
+  // The gateway polls cmd/<node_id>, acts on it, deletes the command, then reports the new state.
   const handleTurnOff = async (target: 'AC' | 'LIGHT') => {
     setIsSending(true);
-    setTimeout(() => {
-      setData((prev) => ({
-        ...prev,
-        ac: target === 'AC' ? 'OFF' : prev.ac,
-        vib: target === 'AC' ? 0 : prev.vib,
-        light: target === 'LIGHT' ? 'OFF' : prev.light,
-        lux: target === 'LIGHT' ? 12 : prev.lux,
-      }));
+    try {
+      await set(ref(db, `cmd/${data.node_id}/${target.toLowerCase()}`), 'OFF');
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
       setIsSending(false);
-    }, 800);
+    }
   };
+
+  const luxText = data.lux == null ? '-' : data.lux < 0 ? 'ไม่พบเซนเซอร์' : `${data.lux} Lux`;
 
   const isWastingEnergy = data.state === 'ABSENT' && (data.ac === 'ON' || data.light === 'ON');
 
@@ -51,6 +77,8 @@ export default function AirtomicDashboard() {
         return { label: 'มีคน - นอนหลับ/นั่งนิ่ง', color: 'bg-blue-100 text-blue-700 border-blue-300' };
       case 'ABSENT':
         return { label: 'ไม่มีคนในห้อง (ABSENT)', color: 'bg-rose-100 text-rose-700 border-rose-300' };
+      default: // gateway didn't send a state (e.g. AI not running yet)
+        return { label: 'ยังไม่มีผล AI', color: 'bg-slate-200 text-slate-600 border-slate-300' };
     }
   };
 
@@ -73,8 +101,29 @@ export default function AirtomicDashboard() {
             <span>NODE: {data.node_id}</span>
             <span className="text-green-400">|</span>
             <span>SEQ: #{data.seq}</span>
+            <span className="text-green-400">|</span>
+            <span>อัปเดต {data.ts ? new Date(data.ts).toLocaleTimeString('th-TH') : '-'}</span>
+            {nodeIds.length > 1 && (
+              <select
+                aria-label="เลือก Node"
+                value={data.node_id}
+                onChange={(e) => setSelected(e.target.value)}
+                className="bg-green-800 text-white rounded px-1"
+              >
+                {nodeIds.map((id) => (
+                  <option key={id} value={id}>{id}</option>
+                ))}
+              </select>
+            )}
+            <button onClick={() => signOut(auth)} title="ออกจากระบบ" aria-label="ออกจากระบบ">
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </header>
+
+        {error && (
+          <div className="bg-amber-100 border border-amber-200 text-amber-800 rounded-xl p-3 text-sm">{error}</div>
+        )}
 
         {/* Alert Banner */}
         {isWastingEnergy && (
@@ -155,7 +204,7 @@ export default function AirtomicDashboard() {
               <div>
                 <p className="font-medium text-slate-900">ไฟส่องสว่าง (Light)</p>
                 <p className={`text-xs ${data.light === 'ON' ? 'text-amber-600 font-medium' : 'text-slate-400'}`}>
-                  สถานะ: {data.light === 'ON' ? `เปิดอยู่ (${data.lux} Lux)` : 'ปิดแล้ว'}
+                  สถานะ: {data.light === 'ON' ? `เปิดอยู่ (${luxText})` : 'ปิดแล้ว'}
                 </p>
               </div>
               <button
@@ -173,13 +222,51 @@ export default function AirtomicDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <SensorCard icon={<Thermometer className="text-orange-500" />} title="อุณหภูมิหน้าแอร์" value={`${data.temp} °C`} sub="DHT22 (SN01)" />
           <SensorCard icon={<Droplets className="text-cyan-600" />} title="ความชื้นสัมพัทธ์" value={`${data.hum} %`} sub="DHT22 (SN01)" />
-          <SensorCard icon={<Sun className="text-amber-500" />} title="ความสว่างในห้อง" value={`${data.lux} Lux`} sub="BH1750 (GW01)" />
+          <SensorCard icon={<Sun className="text-amber-500" />} title="ความสว่างในห้อง" value={luxText} sub="BH1750 (GW01)" />
           <SensorCard icon={<CheckCircle2 className="text-emerald-600" />} title="ความปลอดภัยระบบ" value="Privacy-First" sub="No Camera / Non-Invasive" />
         </div>
 
       </div>
     </div>
   );
+}
+
+function Login() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  return (
+    <Centered>
+      <form onSubmit={submit} className="bg-white border border-slate-200 rounded-2xl p-6 w-full max-w-sm space-y-3 shadow-xs">
+        <h1 className="text-xl font-bold text-green-700">Airtomic Dashboard</h1>
+        <input type="email" required aria-label="อีเมล" placeholder="อีเมล" autoComplete="username"
+          value={email} onChange={(e) => setEmail(e.target.value)}
+          className="w-full border border-slate-300 rounded-lg px-3 py-2" />
+        <input type="password" required aria-label="รหัสผ่าน" placeholder="รหัสผ่าน" autoComplete="current-password"
+          value={password} onChange={(e) => setPassword(e.target.value)}
+          className="w-full border border-slate-300 rounded-lg px-3 py-2" />
+        {error && <p className="text-sm text-rose-600">{error}</p>}
+        <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white rounded-lg py-2 font-medium">
+          เข้าสู่ระบบ
+        </button>
+      </form>
+    </Centered>
+  );
+}
+
+function Centered({ children }: { children: React.ReactNode }) {
+  return <div className="min-h-screen bg-slate-50 text-slate-700 flex items-center justify-center p-6">{children}</div>;
 }
 
 function SensorCard({ icon, title, value, sub }: { icon: React.ReactNode; title: string; value: string; sub: string }) {
