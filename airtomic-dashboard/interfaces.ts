@@ -13,4 +13,5 @@ export interface TelemetryData {
   conf: number;
   ac: 'ON' | 'OFF';
   light: 'ON' | 'OFF';
+  ts?: number; // Firebase server time (ms since 1970) when the gateway wrote this record
 }
