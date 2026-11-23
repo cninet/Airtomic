@@ -1,0 +1,40 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "operators": {
+      ".read": false,
+      ".write": false
+    },
+
+    "nodes": {
+      ".read": "auth != null && (auth.uid === 'ghZKhG6VrBW2xQKMXCe9edFsIGl1' || root.child('operators').child(auth.uid).val() === true)",
+      "$node": {
+        ".write": "auth != null && auth.uid === 'ghZKhG6VrBW2xQKMXCe9edFsIGl1'",
+        ".validate": "newData.hasChildren(['node_id', 'seq'])"
+      }
+    },
+
+    "history": {
+      ".read": "auth != null && (auth.uid === 'ghZKhG6VrBW2xQKMXCe9edFsIGl1' || root.child('operators').child(auth.uid).val() === true)",
+      "$node": {
+        ".indexOn": ["ts"],
+        "$entry": {
+          ".write": "auth != null && auth.uid === 'ghZKhG6VrBW2xQKMXCe9edFsIGl1' && !data.exists()",
+          ".validate": "newData.hasChildren(['node_id', 'seq', 'ts'])"
+        }
+      }
+    },
+
+    "cmd": {
+      ".read": "auth != null && (auth.uid === 'ghZKhG6VrBW2xQKMXCe9edFsIGl1' || root.child('operators').child(auth.uid).val() === true)",
+      "$node": {
+        "$target": {
+          ".write": "auth != null && (auth.uid === 'ghZKhG6VrBW2xQKMXCe9edFsIGl1' || root.child('operators').child(auth.uid).val() === true)",
+          ".validate": "($target === 'ac' || $target === 'light') && newData.val() === 'OFF'"
+        }
+      }
+    }
+  }
+}
