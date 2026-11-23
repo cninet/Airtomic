@@ -2,14 +2,7 @@
 
 #include <cassert>
 #include <cmath>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <fstream>
 #include <iostream>
-#include <sstream>
-#include <string>
-#include <vector>
 
 using namespace airtomic_ai;
 
@@ -248,80 +241,9 @@ void testRetryCapWhenServoFails() {
   assert(reachedMaxRetries);
 }
 
-int runCsvParity(const char *csvPath, bool demoPreset) {
-  std::ifstream in(csvPath);
-  if (!in.is_open()) {
-    std::cerr << "Failed to open CSV: " << csvPath << "\n";
-    return 1;
-  }
-
-  AirtomicRuleEngine engine(demoPreset ? RuleAIConfig::demoFast() : RuleAIConfig::roomDefault());
-  std::string line;
-  if (!std::getline(in, line)) {
-    return 1;
-  }
-
-  std::cout << "timestamp_ms,state,confidence,ac,light,wasting_energy,should_alert,"
-               "should_turn_off_ac,should_turn_off_light,door_open_too_long,verification,"
-               "score_awake,score_sleeping,score_absent,active_rules\n";
-
-  while (std::getline(in, line)) {
-    if (line.empty()) continue;
-    std::stringstream ss(line);
-    std::string cell;
-    std::vector<std::string> cols;
-    while (std::getline(ss, cell, ',')) {
-      cols.push_back(cell);
-    }
-    if (cols.size() < 12) continue;
-
-    SensorInput s;
-    s.timestampMs = std::strtoull(cols[0].c_str(), nullptr, 10);
-    s.tempC = (cols[1] == "nan" || cols[1] == "NaN") ? NAN : std::strtof(cols[1].c_str(), nullptr);
-    s.humPct = (cols[2] == "nan" || cols[2] == "NaN") ? NAN : std::strtof(cols[2].c_str(), nullptr);
-    s.vib = static_cast<int8_t>(std::atoi(cols[3].c_str()));
-    s.distCm = std::strtof(cols[4].c_str(), nullptr);
-    s.pir = static_cast<int8_t>(std::atoi(cols[5].c_str()));
-    s.lightRaw = static_cast<int16_t>(std::atoi(cols[6].c_str()));
-    s.lux = std::strtof(cols[7].c_str(), nullptr);
-    s.bleScannerEnabled = (std::atoi(cols[8].c_str()) != 0);
-    s.rssi = static_cast<int16_t>(std::atoi(cols[9].c_str()));
-    bool notifyAc = (std::atoi(cols[10].c_str()) != 0);
-    bool notifyLight = (std::atoi(cols[11].c_str()) != 0);
-
-    RoomDecision d = engine.update(s);
-    if (notifyAc || notifyLight) {
-      engine.notifyAutoOffTriggered(notifyAc, notifyLight, s.timestampMs);
-    }
-
-    std::printf("%llu,%s,%.6f,%s,%s,%d,%d,%d,%d,%d,%s,%.4f,%.4f,%.4f,%u\n",
-                static_cast<unsigned long long>(s.timestampMs),
-                roomStateToString(d.state),
-                static_cast<double>(d.confidence),
-                d.acOn ? "ON" : "OFF",
-                d.lightOn ? "ON" : "OFF",
-                d.wastingEnergy ? 1 : 0,
-                d.shouldAlert ? 1 : 0,
-                d.shouldTurnOffAc ? 1 : 0,
-                d.shouldTurnOffLight ? 1 : 0,
-                d.doorOpenTooLong ? 1 : 0,
-                verificationStatusToString(d.verification),
-                static_cast<double>(d.scoreAwake),
-                static_cast<double>(d.scoreSleeping),
-                static_cast<double>(d.scoreAbsent),
-                d.activeRules);
-  }
-  return 0;
-}
-
 } // namespace
 
-int main(int argc, char **argv) {
-  if (argc >= 3 && std::strcmp(argv[1], "--csv") == 0) {
-    bool demo = (argc >= 4 && std::strcmp(argv[3], "--demo") == 0);
-    return runCsvParity(argv[2], demo);
-  }
-
+int main() {
   testPirWarmupSafety();
   testLeaveRoomForgotAcAndLightWithBle();
   testLeaveRoomWithoutBle();

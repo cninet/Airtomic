@@ -12,7 +12,7 @@
    - มีคนขยับตัว → `AWAKE`
    - ไม่มีคนขยับนาน แต่ **ไม่ได้เดินออกประตู** (หรือมือถือยังอยู่ / ไฟดับตอนนอน) → `SLEEPING` (`"มีคน - นอนหลับ/นั่งนิ่ง"`) **ไม่ตัดไฟ/แอร์**
    - มีเหตุการณ์ **ประตู (เข้า-ออก)** แล้ว PIR นิ่งต่อเนื่องหลังพ้นช่วง `doorExitGraceMs` (และ/หรือ BLE หาย) → `ABSENT` พร้อมหน่วงยืนยันก่อนสั่ง Servo ปิด
-4. **ต่อยอดเป็น Machine Learning (Phase 2) ได้ง่าย** — เมื่อบอร์ดเริ่มส่งข้อมูลเข้า Firebase `history/<node_id>` แล้ว ใช้ `python/replay_history.py` ดึงข้อมูลจริงมาทดลองปรับ threshold หรือ export เป็น CSV ไปเปรียบเทียบกับ Decision Tree / Random Forest ต่อได้
+4. **ต่อยอดเป็น Machine Learning (Phase 2) ได้ง่าย** — เมื่อบอร์ดเริ่มส่งข้อมูลเข้า Firebase `history/<node_id>` แล้ว สามารถ export ข้อมูลจริงจาก Firebase มาปรับ threshold หรือฝึกโมเดล ML (เช่น Decision Tree / Random Forest) เพื่อเปรียบเทียบต่อได้
 
 ---
 
@@ -21,16 +21,10 @@
 ```text
 ai_model/
 ├── README.md                    # เอกสารอธิบายสถาปัตยกรรม, กฎ, และการเชื่อมต่อ Gateway
-├── cpp/
-│   ├── AirtomicRuleAI.h         # Header พร้อมใช้บน ESP32 Gateway (C++11/17)
-│   ├── AirtomicRuleAI.cpp       # Implementation (Zero-heap, Temporal Rule Scoring)
-│   └── test_rule_ai.cpp         # Unit tests + CSV parity runner บน PC (g++)
-└── python/
-    ├── rule_ai.py               # Python mirror ของ C++ (ลอจิกตรงกัน 100%)
-    ├── simulator.py             # ตัวจำลองสถานการณ์ห้องพัก 9 รูปแบบ (ทั้งมีและไม่มี BLE)
-    ├── evaluate.py              # ประเมินความแม่นยำ, Confusion Matrix, False Auto-Off Rate
-    ├── test_parity.py           # ทดสอบความตรงกัน 100% ระหว่าง Python กับ C++ binary
-    └── replay_history.py        # Replay ข้อมูลจริงจาก Firebase history JSON หรือ CSV
+└── cpp/
+    ├── AirtomicRuleAI.h         # Header พร้อมใช้บน ESP32 Gateway (C++11/17)
+    ├── AirtomicRuleAI.cpp       # Implementation (Zero-heap, Temporal Rule Scoring)
+    └── test_rule_ai.cpp         # Unit tests บน PC (g++)
 ```
 
 ---
@@ -85,22 +79,9 @@ ai_model/
 
 ## วิธีรันทดสอบบน PC
 
-### 1) ทดสอบ Python Simulator + Evaluation (ไม่ต้องลงแพ็กเกจเพิ่ม)
-```powershell
-python ai_model\python\evaluate.py --monte-carlo 20
-python ai_model\python\evaluate.py --timeline morning_rush_forgot_all_ble
-```
-
-### 2) คอมไพล์และรัน C++ Unit Tests + Parity Test (เทียบ Python vs C++ 100%)
 ```powershell
 g++ -std=c++17 -O2 -Wall -Wextra -Werror ai_model\cpp\AirtomicRuleAI.cpp ai_model\cpp\test_rule_ai.cpp -o $env:TEMP\test_rule_ai.exe
 & $env:TEMP\test_rule_ai.exe
-python ai_model\python\test_parity.py
-```
-
-### 3) Replay ข้อมูลจริงจาก Firebase `history/SN01` (เมื่อเริ่มเก็บ Log แล้ว)
-```powershell
-python ai_model\python\replay_history.py path\to\history_SN01.json --out-csv ai_model\outputs\replay_SN01.csv
 ```
 
 ---
