@@ -48,7 +48,7 @@ tests/
 
 ### แบบ A: จำลองผ่านฮาร์ดแวร์ ESP32 ด้วย ESP-NOW (แนะนำสำหรับ Demo Scalability + E4)
 
-โค้ดใน `tests/sim_nodes/sim_nodes.ino` ใช้ `NodeMsg` (26 bytes) และ `AckMsg` (13 bytes) ตรงตาม `firmware/common/messages.h` ทุกไบต์ โดยบอร์ด ESP32 เพียง 1 ตัวสามารถจำลองทั้ง `SN02` และ `SN03` สลับเวลากันทุก 2.5 วินาที (คาบโหนดละ 5 วินาที)
+โค้ดใน `tests/sim_nodes/sim_nodes.ino` ใช้ `NodeMsg` (26 bytes) และ `AckMsg` (13 bytes) ตรงตาม `airtomic/include/messages.h` ทุกไบต์ โดยบอร์ด ESP32 เพียง 1 ตัวสามารถจำลองทั้ง `SN02` และ `SN03` สลับเวลากันทุก 2.5 วินาที (คาบโหนดละ 5 วินาที)
 
 1. คัดลอกไฟล์ตั้งค่า:
    ```bash

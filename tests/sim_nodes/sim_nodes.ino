@@ -4,7 +4,7 @@
  * Purpose:
  *   - Satisfies Section II Scalability: runs 2 simulated sensor nodes (SN02, SN03)
  *     alongside 1 physical sensor node (SN01) simultaneously.
- *   - Uses the exact binary contract from firmware/common/messages.h
+ *   - Uses the exact binary contract from airtomic/include/messages.h
  *     (NodeMsg = 26 bytes, AckMsg = 13 bytes, AIRTOMIC_MSG_VER = 1).
  *   - Implements E4 Reliable Communication: unicast ESP-NOW, ACK wait (200 ms),
  *     up to MAX_RETRIES (3) retries with the SAME seq, and channel auto-rescan.
@@ -33,12 +33,10 @@
 #endif
 #include "secrets.h"
 
-#if __has_include("../../firmware/common/messages.h")
-#include "../../firmware/common/messages.h"
-#elif __has_include("../../airtomic/include/messages.h")
+#if __has_include("../../airtomic/include/messages.h")
 #include "../../airtomic/include/messages.h"
 #else
-// Exact fallback copy of firmware/common/messages.h (AIRTOMIC_MSG_VER = 1)
+// Exact fallback copy of airtomic/include/messages.h (AIRTOMIC_MSG_VER = 1)
 #define AIRTOMIC_MSG_VER 1
 #define NODE_ID_LEN 8
 
@@ -58,8 +56,8 @@ typedef struct __attribute__((packed)) {
   uint32_t seq;
 } AckMsg;
 
-static_assert(sizeof(NodeMsg) == 26, "NodeMsg layout mismatch with firmware/common/messages.h");
-static_assert(sizeof(AckMsg) == 13, "AckMsg layout mismatch with firmware/common/messages.h");
+static_assert(sizeof(NodeMsg) == 26, "NodeMsg layout mismatch with airtomic/include/messages.h");
+static_assert(sizeof(AckMsg) == 13, "AckMsg layout mismatch with airtomic/include/messages.h");
 
 #define NODE_PERIOD_MS 5000
 #define ACK_TIMEOUT_MS 200

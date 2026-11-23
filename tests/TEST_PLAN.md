@@ -12,7 +12,7 @@
 ระบบ Airtomic ประกอบด้วย 4 ชั้นหลักที่ทำงานร่วมกันแบบ End-to-End:
 
 1. **Sensor Node Layer (`SN01` Physical + `SN02`, `SN03` Simulated):**
-   - บอร์ด ESP32 ส่งแพ็กเก็ตไบนารี `NodeMsg` (26 bytes, `AIRTOMIC_MSG_VER = 1` ตาม `firmware/common/messages.h`) ผ่าน **ESP-NOW Unicast** ทุก `NODE_PERIOD_MS = 5000 ms`
+   - บอร์ด ESP32 ส่งแพ็กเก็ตไบนารี `NodeMsg` (26 bytes, `AIRTOMIC_MSG_VER = 1` ตาม `airtomic/include/messages.h`) ผ่าน **ESP-NOW Unicast** ทุก `NODE_PERIOD_MS = 5000 ms`
    - เซนเซอร์บน Node: `DHT22/DHT11` (อุณหภูมิ/ความชื้นหน้าแอร์), `SW-420` (แรงสั่นแอร์ผ่าน Interrupt), `HC-SR04` (ระยะหน้าประตู)
    - การรับประกันการส่ง (E4): รอ `AckMsg` (13 bytes) ภายใน `ACK_TIMEOUT_MS = 200 ms` และส่งซ้ำด้วย `seq` เดิมสูงสุด `MAX_RETRIES = 3` ครั้ง
 2. **Gateway & Edge Processing Layer (`GW01`):**
@@ -30,8 +30,8 @@
    - Next.js Web Dashboard (`airtomic-dashboard/`) แสดงผล Real-time ผ่าน `onValue('nodes')` รองรับสลับดูหลายโหนด (`SN01`, `SN02`, `SN03`) และกดสั่งปิดไฟ/แอร์ระยะไกล
    - ระบบแจ้งเตือนผ่าน LINE / Discord Webhook เมื่อสถานะเป็น `ABSENT` แต่ `ac == "ON"` หรือ `light == "ON"`
 
-> **หมายเหตุจาก การ Audit โค้ดปัจจุบัน (ก่อน Integrate สมบูรณ์):**  
-> ขณะนี้มี Firmware 2 ชุดคือ `firmware/gateway/gateway.ino` (Arduino: BH1750 + `/cmd` polling แต่ยังไม่มี ESP-NOW) และ `airtomic/src/gateway/main.cpp` (PlatformIO: ESP-NOW + ACK + Store-and-forward แต่ส่ง `light_raw` แทน `lux` และยังไม่มี AI/BLE/Actuator/`/cmd`) ทีมต้อง Merge ฟีเจอร์ทั้งหมดและปรับชื่อฟิลด์ให้ตรง `airtomic-dashboard/interfaces.ts` ก่อนรันรอบ Final Acceptance Test
+> **หมายเหตุจากการ Audit โค้ดปัจจุบัน (ก่อน Integrate สมบูรณ์):**  
+> เฟิร์มแวร์หลักของโปรเจกต์อยู่ที่ `airtomic/` (PlatformIO) ซึ่งรองรับ ESP-NOW + ACK + Dedup + Store-and-Forward (`cloudQueue`) และส่งขึ้น Firebase RTDB แล้ว แต่ขณะนี้ส่งฟิลด์ `light_raw` (LDR) แทน `lux`, ใช้ `DHT11`, และยังต้องเพิ่ม `/cmd/<node_id>` polling, BLE RSSI, Edge AI (`state`, `conf`) และ Servo Actuator (`ac`, `light`) ให้ครบตรงตาม `airtomic-dashboard/interfaces.ts` ก่อนรันรอบ Final Acceptance Test
 
 ---
 
@@ -105,7 +105,7 @@
 | **M1** | Sensors ≥ 2 ชนิดต่อบอร์ด / ครอบคลุมสภาพแวดล้อม | Node: DHT22/DHT11, SW-420, HC-SR04 (3 ชนิด); Gateway: BH1750/LDR, HC-SR501 PIR + BLE RSSI | มีโค้ดเกือบครบ (ต้องตกลง BH1750 vs LDR และ DHT11 vs DHT22, เพิ่ม BLE RSSI) | [ ] |
 | **M2** | Edge Processing / Local Intelligence | โมเดล AI จำแนก `AWAKE` / `SLEEPING` / `ABSENT` บน Gateway (`ai_model/`) | รอ `ai_model/` มา Integrate ลง Gateway | [ ] |
 | **M3** | Physical Actuator | Servo Motor กดสวิตช์ปิดไฟและรีโมตแอร์ (Non-invasive) | รอเพิ่มโค้ดคุม Servo ลง Gateway | [ ] |
-| **M4** | Wireless Communication | ESP-NOW (Node ↔ Gateway) + Wi-Fi HTTPS (Gateway ↔ Firebase) | เสร็จแล้วใน `airtomic/` (ต้อง Merge กับ `firmware/gateway/`) | [ ] |
+| **M4** | Wireless Communication | ESP-NOW (Node ↔ Gateway) + Wi-Fi HTTPS (Gateway ↔ Firebase) | เสร็จแล้วใน `airtomic/` (รอเพิ่ม `/cmd/<node_id>` polling) | [ ] |
 | **M5** | Cloud Storage & Dashboard | Firebase RTDB (`nodes/`, `history/`, `cmd/`) + Next.js Dashboard (`airtomic-dashboard/`) | เสร็จแล้ว (ต้องแก้ฟิลด์ `lux` vs `light_raw` และป้าย `SN01`) | [ ] |
 | **M6** | Alerting / Notification | แจ้งเตือนผ่าน LINE / Discord เมื่อ `ABSENT` แต่ไฟ/แอร์ยังเปิดอยู่ | รอเพิ่ม Webhook Notification | [ ] |
 | **M7** | Safety Mechanisms | Servo Timeout/Anti-stall, Manual Emergency Stop, Firebase Rules อนุญาตเฉพาะ `cmd=OFF`, ไม่ตัดไฟตอน `SLEEPING` | Rules เสร็จแล้ว; รอ Servo Safety & Emergency Stop | [ ] |
@@ -117,11 +117,10 @@
 | :---: | --- | --- | --- | :---: |
 | **Scale** | **Multi-node Scalability** | 1 Physical (`SN01`) + 2 Simulated (`SN02`, `SN03`) ทำงานพร้อมกัน, แยกโหนดบน Firebase & Dashboard ได้ | `tests/sim_nodes/` พร้อมแล้ว; Dashboard มี `<select>` แล้ว | [ ] |
 | **E1** | **FreeRTOS Multi-tasking (≥ 3 Tasks)** | แยกอย่างน้อย 3 FreeRTOS Tasks บน Gateway (เช่น Radio/Sensor Task, AI/Actuator Task, Cloud Upload Task) พร้อม Queue/Mutex | ปัจจุบัน `airtomic/src/gateway/main.cpp` มี `uploadTask` + `loopTask` (2 tasks) → ต้องแยกเพิ่มอีกอย่างน้อย 1 task (เช่น AI/Command Task) | [ ] |
-| **E2** | **Hardware Interrupt + Deferred Processing** | `HC-SR501 PIR` (บน Gateway) และ `SW-420` (บน Node) ใช้ `IRAM_ATTR` ISR เพียงตั้ง flag/counter แล้วประมวลผลภายนอก ISR | **เสร็จแล้ว** ทั้งใน `sensors.h`, `local_sensors.cpp` และ `src/main.cpp` | [ ] |
+| **E2** | **Hardware Interrupt + Deferred Processing** | `HC-SR501 PIR` (บน Gateway) และ `SW-420` (บน Node) ใช้ `IRAM_ATTR` ISR เพียงตั้ง flag/counter แล้วประมวลผลภายนอก ISR | **เสร็จแล้ว** ใน `airtomic/src/gateway/local_sensors.cpp` และ `airtomic/src/main.cpp` | [ ] |
 | **E4** | **Reliable Comms (ACK/Retry + Store-and-Forward)** | Unicast ESP-NOW + `AckMsg` ภายใน 200 ms + Retry สูงสุด 3 ครั้ง + Deduplication + `cloudQueue` (32 slots) ส่งย้อนหลังเมื่อ Wi-Fi กลับมา | **เสร็จแล้ว** ใน `airtomic/src/main.cpp` และ `airtomic/src/gateway/main.cpp` | [ ] |
 | **E5** | **Encrypted Cloud & Secret Management** | `WiFiClientSecure` + `GOOGLE_ROOT_CAS` (ไม่ใช้ `setInsecure()`), Firebase Auth + Strict RTDB Rules (`test_rules.sh`), Secrets ในไฟล์ git-ignored | **เสร็จแล้ว** (รัน `firebase/test_rules.sh` ยืนยันซ้ำก่อนส่ง) | [ ] |
-| **E6** | **OTA Firmware Update** | รองรับการอัปเดตเฟิร์มแวร์ผ่าน Wi-Fi โดยไม่ต่อสาย USB (ใช้ Partition `Minimal SPIFFS with OTA`) | กำหนด Partition ใน comment แล้ว → รอเพิ่ม `ArduinoOTA` / HTTP OTA ใน Gateway | [ ] |
-| *(Bonus)* | *(E8 Candidate: Custom I2C Driver)* | `firmware/gateway/sensors.h` เขียน Register-level I2C driver คุยกับ BH1750 เองโดยไม่ใช้ไลบรารี | มีโค้ดใน `firmware/gateway/sensors.h` แล้ว | [ ] |
+| **E6** | **OTA Firmware Update** | รองรับการอัปเดตเฟิร์มแวร์ผ่าน Wi-Fi โดยไม่ต่อสาย USB (ใช้ Partition `Minimal SPIFFS with OTA`) | รอตั้ง Partition + เพิ่ม `ArduinoOTA` / HTTP OTA ใน `airtomic/` | [ ] |
 
 ---
 
