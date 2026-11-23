@@ -1,0 +1,17 @@
+# Airtomic tests/ local ignore rules (E5 / M8: never commit credentials or local runtime artifacts)
+sim_nodes/secrets.h
+sim_nodes/.env
+*.local.env
+.env
+
+# Python virtual environments & caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Raw private exports (keep sample outputs or commit deliberately as needed)
+metrics/data/*.private.json
+metrics/data/*.private.csv
+.DS_Store
